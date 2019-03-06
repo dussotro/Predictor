@@ -56,6 +56,7 @@ class Particule:
         self.U = U
         self.cov = cov
         self.theta = 0
+        self.omega_max = math.radians(10)
         self.auv = figure.create(UnityFigure.OBJECT_3D_SUBMARINE, 0, 0, 0, dimX=5, dimY=5, dimZ=5, color=UnityFigure.COLOR_YELLOW)
         self.auv.updateRotation(0,math.degrees(self.U[1,0]),0)
         time.sleep(0.1)
@@ -98,19 +99,21 @@ class Particule:
         #print("U : ", math.degrees(self.U[1,0]), "th: ", math.degrees(self.theta))
         anim.appendFrame(self.auv, x=self.X[1,0], y=0.0, z=self.X[0,0], rx=0, ry=math.degrees(self.theta), rz=0)
 
-    def controle(self,t,theta_target):
+    def controle(self,dt,theta_target):
         """
         Control equation of the AUV
         """
         k = 1
-        self.U[1,0] = k*(theta_target-self.theta)
+        self.theta += dt*self.sign(theta_target - self.theta)*min(self.omega_max, abs(theta_target - self.theta))
+
 
     def f(self):
         """
         State equation of the AUV
         alpha : bruit gaussien sur x,y et v
         """
-        theta = self.U[1,0]
+
+        theta = self.theta
         u = self.U[0,0]
 
         sigma_x, sigma_y,sigma_v = 0.1,0.5,0.15
@@ -129,31 +132,28 @@ class Particule:
         """
         Allows to apply the evolution model between t and t+dt
         """
-        if t == 1:
+        if t == 60:
             C = array([[1,0,0],[0,1,0]])
             G_beta = diag([[0.45**2],[0.45**2]])
         else :
             C = zeros((2,3))
             G_beta = zeros((2,2))
 
-        """
-        if t<60:
-            theta_target = 0
-        else:
-            theta_target = np.pi
-        """
-        theta_target = 0
-
+        
+        if t==60:
+            self.U[1,0] = arctan2(self.X[1,0], self.X[0,0]) + np.pi
+        
         sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
         G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
 
         self.X = self.X + dt*self.f()
-        
+
+
         U = self.U.flatten()
         
         A  = array([[1,0,cos(self.theta)],[0,1,sin(self.theta)],[0,0,-1]])
         self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
-        self.controle(t, theta_target)
+        self.controle(dt, self.U[1,0])
 
 
     def afficher_ellipse(self,ax,col):

@@ -35,19 +35,20 @@ class mission:
 
 	def recalage(self):
 		for part in self.listParticules:
-
+			
 			x_gps = part.X[0,0] + part.noise(0.48)
 			y_gps = part.X[1,0] + part.noise(0.48)
-
+			"""
 			part.Xchap[0,0] = x_gps
 			part.Xchap[1,0] = y_gps
 
 			part.cov = np.diag([0.48**2, 0.48**2, part.cov[2,2]])
+			"""
+
+			L = x_gps
+			h = y_gps
 			
-			L = part.Xchap[0,0]
-			h = part.Xchap[1,0]
-			
-			part.theta = -(np.arctan2(h,L) + np.pi)
+			#part.theta = -(np.arctan2(h,L) + np.pi)
 			part.U[1,0] = part.theta
 
 	def aller_retour(self):
@@ -56,7 +57,7 @@ class mission:
 			part.theta = np.arctan2(0.0001, 50)
 
 		while self.t < self.tfinal :
-			print("[{:.2f},{:.2f},{:.2f}]".format(self.listParticules[0].X[0,0], self.listParticules[0].X[1,0], self.listParticules[0].X[2,0]))
+			#print("[{:.2f},{:.2f},{:.2f}]".format(self.listParticules[0].X[0,0], self.listParticules[0].X[1,0], self.listParticules[0].X[2,0]))
 			sys.stdout.write("Aller  : t = %f \r" % self.t)
 			for part in self.listParticules: 
 				part.step(self.t, self.dt)
