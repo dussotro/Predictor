@@ -35,7 +35,7 @@ class Particule:
     """
     Particule class
     """
-    def __init__(self,X,U,cov, figure):
+    def __init__(self,X,U,cov, figure, tf):
         """
         Constructor
         Parameters
@@ -57,6 +57,7 @@ class Particule:
         self.cov = cov
         self.theta = 0
         self.omega_max = math.radians(10)
+        self.tfinal = tf
         self.auv = figure.create(UnityFigure.OBJECT_3D_SUBMARINE, 0, 0, 0, dimX=5, dimY=5, dimZ=5, color=UnityFigure.COLOR_YELLOW)
         self.auv.updateRotation(0,math.degrees(self.U[1,0]),0)
         time.sleep(0.1)
@@ -99,12 +100,13 @@ class Particule:
         #print("U : ", math.degrees(self.U[1,0]), "th: ", math.degrees(self.theta))
         anim.appendFrame(self.auv, x=self.X[1,0], y=0.0, z=self.X[0,0], rx=0, ry=math.degrees(self.theta), rz=0)
 
-    def controle(self,dt,theta_target):
+    def controle(self,t,dt):
         """
         Control equation of the AUV
-        """
-        k = 1
-        self.theta += dt*self.sign(theta_target - self.theta)*min(self.omega_max, abs(theta_target - self.theta))
+        """  
+        if t>self.tfinal:
+            self.U[1,0] = arctan2(self.Xchap[1,0], self.Xchap[0,0]) + np.pi
+        self.theta += dt*self.sign(self.U[1,0] - self.theta)*min(self.omega_max, abs(self.U[1,0] - self.theta))
 
 
     def f(self):
@@ -113,53 +115,47 @@ class Particule:
         alpha : bruit gaussien sur x,y et v
         """
 
-        theta = self.theta
-        u = self.U[0,0]
-
-        sigma_x, sigma_y,sigma_v = 0.1,0.5,0.15
+        sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
         G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
 
         alpha = np.zeros((3,1))
-        alpha[0,0] = np.random.normal(0,sigma_x**2)
-        alpha[1,0] = np.random.normal(0,sigma_y**2)
-        alpha[2,0] = np.random.normal(0,sigma_v**2)
+        alpha[0,0] = np.random.normal(0,sigma_x)
+        alpha[1,0] = np.random.normal(0,sigma_y)
+        alpha[2,0] = np.random.normal(0,sigma_v)
 
-        A  = array([[0,0,cos(theta)],[0,0,sin(theta)],[0,0,-1]])
-        return A.dot(self.X) + array([[0],[0],[u]]) + alpha
+        A  = array([[0,0,cos(self.theta)],[0,0,sin(self.theta)],[0,0,-1]])
+        return A.dot(self.X) + array([[0],[0],[self.U[0,0]]]) + alpha
 
 
     def step(self,t,dt):
         """
         Allows to apply the evolution model between t and t+dt
         """
-        if t == 60:
-            C = array([[1,0,0],[0,1,0]])
-            G_beta = diag([[0.45**2],[0.45**2]])
+        if (self.tfinal - 0.01 < t < self.tfinal + 0.01):
+            C      = array([[1,0,0],[0,1,0]])
+            G_beta = diag([[0.48**2],[0.48**2]])
         else :
-            C = zeros((2,3))
+            C      = zeros((2,3))
             G_beta = zeros((2,2))
-
-        
-        if t==60:
-            self.U[1,0] = arctan2(self.X[1,0], self.X[0,0]) + np.pi
         
         sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
         G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
 
         self.X = self.X + dt*self.f()
 
-
         U = self.U.flatten()
         
-        A  = array([[1,0,cos(self.theta)],[0,1,sin(self.theta)],[0,0,-1]])
-        self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
-        self.controle(dt, self.U[1,0])
+        A  = array([[1,0,cos(self.theta)],
+                    [0,1,sin(self.theta)],
+                    [0,0,-1]])
 
+        self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
+        self.controle(t, dt)
 
     def afficher_ellipse(self,ax,col):
-    #draw_ellipse(c,Γ,η,ax,col): # Gaussian confidence ellipse with artist
-    #draw_ellipse(array([[1],[2]]),eye(2),0.9,ax,[1,0.8-0.3*i,0.8-0.3*i])
-        draw_ellipse(self.Xchap[0:2,0],self.cov[0:2, 0:2],0.99,ax,col)
+        #draw_ellipse(c,Γ,η,ax,col): # Gaussian confidence ellipse with artist
+        #draw_ellipse(array([[1],[2]]),eye(2),0.9,ax,[1,0.8-0.3*i,0.8-0.3*i])
+        draw_ellipse(self.Xchap[0:2,0],self.cov[0:2, 0:2],0.99,col)
 
 
 def afficher_ellipse_all(tab_part,col):
