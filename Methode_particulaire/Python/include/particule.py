@@ -105,26 +105,16 @@ class Particule:
         Control equation of the AUV
         """  
         if t>self.tfinal:
-            self.U[1,0] = arctan2(self.Xchap[1,0], self.Xchap[0,0]) + np.pi
+            self.U[1,0] = sawtooth(self.Xchap[1,0]/self.Xchap[0,0])
         self.theta += dt*self.sign(self.U[1,0] - self.theta)*min(self.omega_max, abs(self.U[1,0] - self.theta))
 
 
     def f(self):
         """
         State equation of the AUV
-        alpha : bruit gaussien sur x,y et v
         """
-
-        sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
-        G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
-
-        alpha = np.zeros((3,1))
-        alpha[0,0] = np.random.normal(0,sigma_x)
-        alpha[1,0] = np.random.normal(0,sigma_y)
-        alpha[2,0] = np.random.normal(0,sigma_v)
-
         A  = array([[0,0,cos(self.theta)],[0,0,sin(self.theta)],[0,0,-1]])
-        return A.dot(self.X) + array([[0],[0],[self.U[0,0]]]) + alpha
+        return A.dot(self.X) + array([[0],[0],[self.U[0,0]]]) 
 
 
     def step(self,t,dt):
@@ -141,7 +131,12 @@ class Particule:
         sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
         G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
 
-        self.X = self.X + dt*self.f()
+        alpha = np.zeros((3,1))
+        alpha[0,0] = np.random.normal(0,sigma_x**2)
+        alpha[1,0] = np.random.normal(0,sigma_y**2)
+        alpha[2,0] = np.random.normal(0,sigma_v**2)
+
+        self.X = self.X + dt*self.f() + alpha
 
         U = self.U.flatten()
         
@@ -149,13 +144,13 @@ class Particule:
                     [0,1,sin(self.theta)],
                     [0,0,-1]])
 
-        self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
+        self.Xchap,self.cov = kalman(self.Xchap,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
         self.controle(t, dt)
 
     def afficher_ellipse(self,ax,col):
         #draw_ellipse(c,Γ,η,ax,col): # Gaussian confidence ellipse with artist
         #draw_ellipse(array([[1],[2]]),eye(2),0.9,ax,[1,0.8-0.3*i,0.8-0.3*i])
-        draw_ellipse(self.Xchap[0:2,0],self.cov[0:2, 0:2],0.99,col)
+        draw_ellipse(self.Xchap[0:2,0],self.cov[0:2, 0:2],0.99,ax,col)
 
 
 def afficher_ellipse_all(tab_part,col):
@@ -166,8 +161,8 @@ def afficher_ellipse_all(tab_part,col):
     """    
     all_Xchap = [p.Xchap[0,0] for p in tab_part]
     all_Ychap = [p.Xchap[1,0] for p in tab_part]    
-    fig = plt.figure(0)
-    ax = fig.add_subplot(111, aspect='equal')
+    #fig = plt.figure(0)
+    #ax = fig.add_subplot(111, aspect='equal')
     ax.set_xlim(min(all_Xchap)-30, max(all_Xchap)+30)
     ax.set_ylim(min(all_Ychap)-30, max(all_Ychap)+30)
     for p in tab_part:

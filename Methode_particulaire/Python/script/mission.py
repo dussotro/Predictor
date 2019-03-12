@@ -17,8 +17,7 @@ class mission:
 		self.dt = 0.1
 		
 		self.num = num
-		self.traj_part0 = []
-		self.traj_part5 = []
+		self.traj_part = N*[[]]
 		self.anim = self.figure.createAnimation(self.dt)
 		time.sleep(1)
 	
@@ -63,12 +62,14 @@ class mission:
 			
 			x_gps = part.X[0,0] + part.noise(0.48**2)
 			y_gps = part.X[1,0] + part.noise(0.48**2)
+			
 			"""
 			part.Xchap[0,0] = x_gps
 			part.Xchap[1,0] = y_gps
 
 			part.cov = np.diag([0.48**2, 0.48**2, part.cov[2,2]])
 			"""
+
 			L = x_gps
 			h = y_gps
 			
@@ -86,15 +87,18 @@ class mission:
 		for part in self.listParticules:
 			part.theta = np.arctan2(0.0001, 50)
 
+		self.afficher_ellipse_all(ax, "red")
+
 		while self.t < self.tfinal :
 			#print("[{:.2f},{:.2f},{:.2f}]".format(self.listParticules[0].X[0,0], self.listParticules[0].X[1,0], self.listParticules[0].X[2,0]))
 			sys.stdout.write("Aller  : t = %f \r" % self.t)
-			for part in self.listParticules: 
+			for ind,part in enumerate(self.listParticules): 
 				part.step(self.t, self.dt)
 				part.appendFrame(self.anim)
-			self.listParticules[0].afficher_ellipse(ax, "r")
-			#self.traj_part0.append(self.listParticules[0].X[0:2])
-			#self.traj_part5.append(self.listParticules[5].X[0:2])
+				self.traj_part[ind].append(part.X[0:2])
+			#self.listParticules[0].afficher_ellipse(ax, "r")
+			#for i in range(N):
+			#	self.traj_part[i].append(self.listParticules[0].X[0:2])
 			self.t  += self.dt
 
 		""" Affichage """
@@ -103,37 +107,43 @@ class mission:
 
 		self.recalage()
 
-		fig_ellipse = plt.figure() 
-		ax_ret = fig_ellipse.add_subplot(111, aspect='equal')
+		#fig_ellipse = plt.figure() 
+		#ax_ret = fig_ellipse.add_subplot(111, aspect='equal')
 
 		while self.t < 2*self.tfinal+20:
 			sys.stdout.write("Retour : t = %f \r" % self.t)
-			for part in self.listParticules: 
+			for ind,part in enumerate(self.listParticules): 
 				part.step(self.t, self.dt)
 				part.appendFrame(self.anim)
-			self.listParticules[0].afficher_ellipse(ax_ret, "r")
-			#self.traj_part0.append(self.listParticules[0].X[0:2])
-			#self.traj_part5.append(self.listParticules[5].X[0:2])
+				self.traj_part[ind].append(part.X[0:2])
+			#self.listParticules[0].afficher_ellipse(ax_ret, "r")
+			#for i in range(N):
+			#	self.traj_part[i].append(self.listParticules[0].X[0:2])
 			self.t  += self.dt
 
+		self.afficher_ellipse_all(ax, "green")
+
 		""" Affichage """
-		self.afficher_ellipse_all(ax_ret, "green")
 		
+		x_plot = N*[[0.0]]
+		y_plot = N*[[0.0]]
+		#print("size traj_part = ({},{},{})".format(len(self.traj_part), len(self.traj_part[0]), len(self.traj_part[0])))
+		
+		#print(x_plot)
+		#print(self.traj_part[0][0:5])
+		
+		for k in range(N):
+			for i_t in range(14000):
+				x_plot[k].append(self.traj_part[k][i_t][0,0])
+				y_plot[k].append(self.traj_part[k][i_t][1,0])
 		
 		#xplot_0 = [self.traj_part0[i][0] for i in range(len(self.traj_part0))]
 		#yplot_0 = [self.traj_part0[i][1] for i in range(len(self.traj_part0))]
 		#xplot_5 = [self.traj_part5[i][0] for i in range(len(self.traj_part5))]
 		#yplot_5 = [self.traj_part5[i][1] for i in range(len(self.traj_part5))]
-		
-		part_pos_x = []
-		part_pos_y = []
-		for part in self.listParticules:
-			part_pos_x.append(part.X[0,0])
-			part_pos_y.append(part.X[1,0])
 
-		#plt.plot(xplot_0, yplot_0, 'bo', markersize='0.5', )
-		#plt.plot(xplot_5, yplot_5, 'bo', markersize='0.5')
-		plt.plot(part_pos_x, part_pos_y, '+b')
+		for k in range(N):
+			plt.plot(x_plot[k], y_plot[k], '+b', markersize=0.2)
 
 		plt.xlabel("coordonnee x en metres")
 		plt.ylabel("coordonnee y en metres")
@@ -143,8 +153,6 @@ class mission:
 		print("\n Done ! ")
 		time.sleep(1)
 		self.display()
-
-
 
 	def run(self):
 		while self.t < self.tfinal :	
@@ -159,6 +167,6 @@ class mission:
 		self.display()
 
 if __name__=='__main__':
-	N = 2
+	N = 10
 	mission = mission(N)
 	mission.aller_retour()
