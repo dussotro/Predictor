@@ -10,7 +10,7 @@ from PyUnityVibes.UnityFigure import UnityFigure
 class mission:
 	def __init__(self, num):
 		self.figure = UnityFigure(UnityFigure.FIGURE_3D, UnityFigure.SCENE_EMPTY)
-		time.sleep(2)
+		time.sleep(1)
 		self.tfinal = 60
 		self.listParticules = [Particule(np.array([[0.0],[0.0],[0.0]]), np.array([[1.0],[0.0]]), np.diag((10**-9,10**-9,10**-9)), self.figure ) for i in range(num)]
 		time.sleep(1)
@@ -19,7 +19,12 @@ class mission:
 		self.dt = 0.1
 		
 		self.num = num
-		self.traj_part = N*[[]]
+		self.traj_part_X = []
+		self.traj_part_Y = []
+		for _ in range(N):
+			self.traj_part_X.append([])
+			self.traj_part_Y.append([])
+
 		self.anim = self.figure.createAnimation(self.dt)
 		self.listboue = [[50,0],[25,25],[0,0]]
 
@@ -28,7 +33,7 @@ class mission:
 		print("Ajout des objets à l'animation")
 		for part in self.listParticules:
 			self.anim.addObject(part.auv)
-			time.sleep(1.5)
+		time.sleep(1.5)
 
 
 
@@ -46,120 +51,81 @@ class mission:
 		self.figure.animate(self.anim)
 
 	def afficher_ellipse_all(self, ax, col=[0.9,0,0]):
-     
-		global max_x, max_y, min_y, min_x #pour regler la fenetre de l'affichage
-		all_Xchap = [p.Xchap[0,0] for p in self.listParticules]
-		all_Ychap = [p.Xchap[1,0] for p in self.listParticules]
+   		for p in self.listParticules:
+   			p.afficher_ellipse(ax,col)
 
-		if min(all_Xchap) < min_x or min_x == None:
-			min_x = min(all_Xchap)
-
-		if min(all_Ychap) < min_y or min_y == None:
-			min_y = min(all_Ychap)
-
-		if max(all_Xchap) > max_x or max_x == None:
-			max_x = max(all_Xchap)
-
-		if max(all_Ychap) > max_y or max_y == None:
-			max_y = max(all_Ychap)
-
-		ax.set_xlim(min_x-30, max_x+30)
-		ax.set_ylim(min_y-30, max_y+30)
-		for p in self.listParticules:
-			p.afficher_ellipse(ax,col)
-
-	def recalage(self):
+	def recalage(self, amer):
 		for part in self.listParticules:
 			
 			x_gps = part.X[0,0] + part.noise(0.48**2)
 			y_gps = part.X[1,0] + part.noise(0.48**2)
+
 			
-			"""
-			part.Xchap[0,0] = x_gps
-			part.Xchap[1,0] = y_gps
-
-			part.cov = np.diag([0.48**2, 0.48**2, part.cov[2,2]])
-			"""
-
-			L = amer[0] - part.Xchap[0,0]
-			h = amer[1] - part.Xchap[1,0]
+			L = 0 - part.Xchap[0,0]
+			h = 0 - part.Xchap[1,0]
 
 			part.theta = np.arctan2(h,L) #-(np.arctan2(h,L) + np.pi)
 			part.U[1,0] = part.theta
 
-	def aller_retour(self):
-
-		global max_x, max_y, min_y, min_x   #pour regler la fenetre de l'affichage
-		max_x, max_y, min_y, min_x = self.listParticules[0].Xchap[0,0], self.listParticules[0].Xchap[1,0], self.listParticules[0].Xchap[1,0], self.listParticules[0].Xchap[0,0]
-
+	def aller_retour(self, amer):
 		for part in self.listParticules:
 			part.theta = np.arctan2(0.0001, 50)
 
-		self.afficher_ellipse_all(ax, "red")
+		# Figure
+		################
+		fig = plt.figure()
+		ax = fig.add_subplot(111, aspect='equal')
+		################
 
+		#self.afficher_ellipse_all(ax, "red")
+		
+		#Aller
+		############################
 		while self.t < self.tfinal :
-			#print("[{:.2f},{:.2f},{:.2f}]".format(self.listParticules[0].X[0,0], self.listParticules[0].X[1,0], self.listParticules[0].X[2,0]))
 			sys.stdout.write("Aller  : t = %f \r" % self.t)
-			for part in self.listParticules:
-				part.step_aller_retour(self.t, self.dt)
+			for ind,part in enumerate(self.listParticules):
+				part.step_aller_retour(self.t, self.dt, amer)
 				part.appendFrame(self.anim)
-				self.traj_part[ind].append(part.X[0:2])
-			#self.listParticules[0].afficher_ellipse(ax, "r")
-			#for i in range(N):
-			#	self.traj_part[i].append(self.listParticules[0].X[0:2])
+				self.traj_part_X[ind].append(part.X[0,0])
+				self.traj_part_Y[ind].append(part.X[1,0])
+			#self.afficher_ellipse_all(ax, "green")		
 			self.t  += self.dt
+			
+		############################
+		
+		#self.afficher_ellipse_all(ax, "red")
 
-
-
-		print(self.listParticules[0])
-		self.recalage()
-		print(self.listParticules[0])
-
-		""" Affichage """
-
-		self.afficher_ellipse_all(ax, "red")
-
-
-		self.recalage()
-
-		while self.t < 2*self.tfinal+20:
+		#Retour
+		############################
+		while self.t < 2*self.tfinal + 20:
 			sys.stdout.write("Retour : t = %f \r" % self.t)
 			for ind,part in enumerate(self.listParticules): 
-				part.step(self.t, self.dt)
+				part.step_aller_retour(self.t, self.dt,amer)
 				part.appendFrame(self.anim)
-				self.traj_part[ind].append(part.X[0:2])
-			#self.listParticules[0].afficher_ellipse(ax_ret, "r")
-			#for i in range(N):
-			#	self.traj_part[i].append(self.listParticules[0].X[0:2])
+				self.traj_part_X[ind].append(part.X[0,0])
+				self.traj_part_Y[ind].append(part.X[1,0])
+			#self.afficher_ellipse_all(ax, "green")
 			self.t  += self.dt
 
-		self.afficher_ellipse_all(ax, "green")
+		#self.afficher_ellipse_all(ax, "green")
+		print("\n")
 
-		""" Affichage """
-		
-		x_plot = N*[[0.0]]
-		y_plot = N*[[0.0]]
-		#print("size traj_part = ({},{},{})".format(len(self.traj_part), len(self.traj_part[0]), len(self.traj_part[0])))
-		
-		#print(x_plot)
-		#print(self.traj_part[0][0:5])
-		
+		# Display the trajectories 
+		#########################
+		ind_inter = int(self.tfinal/self.dt)
 		for k in range(N):
-			for i_t in range(14000):
-				x_plot[k].append(self.traj_part[k][i_t][0,0])
-				y_plot[k].append(self.traj_part[k][i_t][1,0])
-		
-		#xplot_0 = [self.traj_part0[i][0] for i in range(len(self.traj_part0))]
-		#yplot_0 = [self.traj_part0[i][1] for i in range(len(self.traj_part0))]
-		#xplot_5 = [self.traj_part5[i][0] for i in range(len(self.traj_part5))]
-		#yplot_5 = [self.traj_part5[i][1] for i in range(len(self.traj_part5))]
+			plt.plot(self.traj_part_X[k][:ind_inter], self.traj_part_Y[k][:ind_inter], 'b')
+			plt.plot(self.traj_part_X[k][:ind_inter], self.traj_part_Y[k][:ind_inter], 'b')
 
 		for k in range(N):
-			plt.plot(x_plot[k], y_plot[k], '+b', markersize=0.2)
+			plt.plot(self.traj_part_X[k][ind_inter:], self.traj_part_Y[k][ind_inter:], 'r')
+			plt.plot(self.traj_part_X[k][ind_inter:], self.traj_part_Y[k][ind_inter:], 'r')
+		#########################
 
-		plt.xlabel("coordonnee x en metres")
-		plt.ylabel("coordonnee y en metres")
-		plt.title("Ellipses d'incertitude en position pour les differents\n auv apres trajet aller puis apres trajet retour")
+		plt.xlim([-30, 150])
+		plt.ylim([-60,  60])
+		plt.xlabel("x (m)")
+		plt.ylabel("y (m)")
 		plt.show()
 
 		print("\n Done ! ")
@@ -212,4 +178,5 @@ class mission:
 if __name__=='__main__':
 	N = 10
 	mission = mission(N)
-	mission.mission_triangle([[50,0],[25,25],[0,0]])
+	#mission.mission_triangle([[50,0],[25,25],[0,0]])
+	mission.aller_retour([[60,0],[0,0]])

@@ -35,7 +35,7 @@ class Particule:
     """
     Particule class
     """
-    def __init__(self,X,U,cov, figure, tf):
+    def __init__(self,X,U,cov, figure):
         """
         Constructor
         Parameters
@@ -57,10 +57,8 @@ class Particule:
         self.cov = cov
         self.theta = 0
         self.omega_max = math.radians(10)
-        self.tfinal = tf
+        self.tfinal = 60
         self.auv = figure.create(UnityFigure.OBJECT_3D_SUBMARINE, 0, 0, 0, dimX=5, dimY=5, dimZ=5, color=UnityFigure.COLOR_YELLOW)
-        self.auv.updateRotation(0,math.degrees(self.U[1,0]),0)
-        self.omega_max = 10 * 2*np.pi/360
         time.sleep(0.1)
 
 
@@ -109,10 +107,9 @@ class Particule:
         """
         Control equation of the AUV
         """
-        #print(">>>", theta_target, self.theta)
-        self.U[1,0] =np.arctan2(amer_target[1] - self.Xchap[1,0],amer_target[0] - self.Xchap[0,0])
-        #self.theta += 0.1* (self.U[1,0]-self.theta)* min(self.omega_max,abs(self.U[1,0]-self.theta))
-        self.theta += (self.omega_max/np.pi)*sawtooth(self.U[1,0]-self.theta)
+        self.U[1,0] = np.arctan2(amer_target[1] - self.Xchap[1,0], amer_target[0] - self.Xchap[0,0])
+        #self.U[1,0] = np.pi
+        self.theta += 0.1*max(min(10, (self.omega_max/np.pi)*sawtooth(self.U[1,0]-self.theta)), -10)
     
     def f(self):
         """
@@ -123,7 +120,7 @@ class Particule:
         return A.dot(self.X) + array([[0],[0],[self.U[0,0]]]) 
 
 
-    def step_aller_retour(self,t,dt):
+    def step_aller_retour(self,t,dt, amer):
         """
         Allows to apply the evolution model between t and t+dt
         """
@@ -135,33 +132,25 @@ class Particule:
             C      = zeros((2,3))
             G_beta = zeros((2,2))
         
+        if t>self.tfinal:
+            amer = [0,0]
+        else:
+            amer = [self.tfinal,0]
+
         sigma_x, sigma_y,sigma_v = 0.1,0.1,0.15
-        G_alpha = np.diag([sigma_x**2,sigma_y**2,sigma_v**2])
-
+        G_alpha = np.diag([dt*sigma_x**2,dt*sigma_y**2,dt*sigma_v**2])
         alpha = np.zeros((3,1))
-        alpha[0,0] = np.random.normal(0,sigma_x**2)
-        alpha[1,0] = np.random.normal(0,sigma_y**2)
-        alpha[2,0] = np.random.normal(0,sigma_v**2)
+        alpha[0,0] = np.random.normal(0,sigma_x)
+        alpha[1,0] = np.random.normal(0,sigma_y)
+        alpha[2,0] = np.random.normal(0,sigma_v)
 
-        self.X = self.X + dt*self.f() + alpha
+        self.X = self.X + dt*self.f() + dt*alpha
 
         U = self.U.flatten()
-        
-        A  = array([[1,0,cos(self.theta)],
-                    [0,1,sin(self.theta)],
-                    [0,0,-1]])
 
+        A  = array([[1,0,dt*cos(self.theta)],[0,1,dt*sin(self.theta)],[0,0,-1]])
         self.Xchap,self.cov = kalman(self.Xchap,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
-        self.controle(t, dt)
-
-        self.X = self.X + dt*self.f()
-        #print("X apres : [{},{},{}]".format(self.X[0,0], self.X[1,0], self.X[2,0]))
-
-        U = self.U.flatten()
-
-        A  = array([[1,0,cos(self.theta)],[0,1,sin(self.theta)],[0,0,-1]])
-        self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
-        self.controle(t, theta_target)
+        self.controle(t, amer)
 
     def step_mission(self,t,dt,presence_amer,amer_target):
 
@@ -184,7 +173,7 @@ class Particule:
         U = self.U.flatten()
 
         A  = array([[1,0,cos(self.theta)],[0,1,sin(self.theta)],[0,0,-1]])
-        self.Xchap,self.cov = kalman(self.X,self.cov,array([[0],[0],[U[0]]]),G_beta ,G_alpha,G_beta,A,C)
+        self.Xchap,self.cov = kalman(self.Xchap,self.cov,array([[0],[0],[dt*U[0,0]]]),G_beta ,G_alpha,G_beta,A,C)
         self.controle(t, amer_target)
 
 
@@ -206,8 +195,9 @@ def afficher_ellipse_all(tab_part,col):
     #fig = plt.figure(0)
     #ax = fig.add_subplot(111, aspect='equal')
 
-    ax.set_xlim(min(all_Xchap)-30, max(all_Xchap)+30)
-    ax.set_ylim(min(all_Ychap)-30, max(all_Ychap)+30)
+    ax.set_xlim(-30, 100)
+    ax.set_ylim(-50, 50)
+
     for p in tab_part:
         p.afficher_ellipse(ax,col)
 

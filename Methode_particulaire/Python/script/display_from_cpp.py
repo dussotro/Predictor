@@ -30,8 +30,12 @@ parts = np.zeros((N, int(T/dt), 6))
 for line in data:
 	data_line = line.split(";")
 	ID, t, x, y, z, rx, ry, rz = [float(el) for el in data_line]
+	#print(ID, t, x, y, z)
 	ID = int(ID)
-	parts[ID, int(T/dt)-1] = x, y, z, rx, ry , rz
+	#print(int(t/dt)-1)
+	parts[ID, int(t/dt)-1] = x, y, z, rx, ry , rz
+
+#print(parts[0])
 
 ### Initialisation de Unity ###
 figure = UnityFigure(UnityFigure.FIGURE_3D, UnityFigure.SCENE_EMPTY)
@@ -43,16 +47,25 @@ time.sleep(1)
 ### Creation des AUVs ###
 AUVs = []
 for ind_auv in range(N):
-	AUVs.append(figure.create(UnityFigure.OBJECT_3D_SUBMARINE, 0, -0.4, 0, dimX=5, dimY=5, dimZ=5))
+	AUVs.append(figure.create(UnityFigure.OBJECT_3D_SUBMARINE, 0, -0.4, 0, dimX=1, dimY=1, dimZ=5, color=UnityFigure.COLOR_YELLOW))
 	anim.addObject(AUVs[ind_auv])
 	time.sleep(0.1)
+
+for coord in [[0,0],[50,0],[25,25]]:
+			boue = figure.create(UnityFigure.OBJECT_3D_CUBE, -coord[1], -2, coord[0], dimX=0.2, dimY=5, dimZ=0.2, color=UnityFigure.COLOR_RED)
+			anim.addObject(boue)
+			time.sleep(0.5)
+
 time.sleep(1)
 
 ### Calcul des frames successives ###
-for t in np.arange(0, T, dt):
+for k in range(int(T/dt)):
+	sys.stdout.write("t = {} s \r".format(t))
 	for ind_auv, auv in enumerate(AUVs):
-		x, y, z, rx, ry, rz = parts[ind_auv, int(t/dt)]
-		anim.appendFrame(auv, x=x, y=y, z=z, rx=rx, ry=ry, rz=rz)
+		x_p, y_p, z_p, rx_p, ry_p, rz_p = parts[ind_auv, k]
+		#print(x_p, y_p, z_p, rx_p, ry_p, rz_p)
+		anim.appendFrame(auv, x=-y_p, y=-z_p, z=x_p, rx=rx_p, ry=-rz_p, rz=ry_p)
+print("")
 time.sleep(1)
 
 
